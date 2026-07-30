@@ -53,16 +53,21 @@ To use theses modules, configure your nginx branch with `--add-module=/path/to/n
 **Context:** *http, server, location*
 
 Enables or disables decompression of zstd compressed responses for clients that lack zstd support.
+When built with `ngx_condition_module`, this directive can also be configured
+inside a `when` block.
 
 ## unzstd_force
 
-**Syntax:** *unzstd_force string ...;*
+**Syntax:** *unzstd_force on | off;*
 
-**Default:** *-*
+**Default:** *unzstd_force off;*
 
 **Context:** *http, server, location*
 
-Defines the conditions for forced brotli decompression. If at least one value in the string parameter is not empty and not equal to "0", forced zstd decompression is performed. But it will not try to decompress responses that do not contain the response header Content-Encoding: zstd.
+When enabled, decompresses zstd responses without checking whether the client
+accepts zstd. Responses without `Content-Encoding: zstd` are not affected.
+When built with `ngx_condition_module`, this directive can also be configured
+inside a `when` block.
 
 ## unzstd_buffers
 

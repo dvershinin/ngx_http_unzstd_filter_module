@@ -10,6 +10,10 @@
 
 #include <zstd.h>
 
+#if (NGX_CONDITION)
+#include <ngx_http_condition_module.h>
+#endif
+
 
 #define NGX_HTTP_UNZSTD_IN_BUF_NO_FLUSH        0
 #define NGX_HTTP_UNZSTD_IN_BUF_SYNC_FLUSH      1
@@ -23,8 +27,13 @@ typedef struct {
 
 
 typedef struct {
-    ngx_flag_t                   enable;
+#if (NGX_CONDITION)
+    ngx_array_t                 *enable;
     ngx_array_t                 *force;
+#else
+    ngx_flag_t                   enable;
+    ngx_flag_t                   force;
+#endif
     ngx_bufs_t                   bufs;
 } ngx_http_unzstd_conf_t;
 
@@ -87,15 +96,33 @@ static void ngx_http_unzstd_filter_free(void *opaque, void *address);
 static ngx_command_t  ngx_http_unzstd_filter_commands[] = {
 
     { ngx_string("unzstd"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF
+#if (NGX_CONDITION)
+                        |NGX_HTTP_MAIN_WHEN_CONF|NGX_HTTP_SRV_WHEN_CONF
+                        |NGX_HTTP_LOC_WHEN_CONF
+#endif
+                        |NGX_CONF_FLAG,
+#if (NGX_CONDITION)
+      ngx_conf_set_conditional_flag_slot,
+#else
       ngx_conf_set_flag_slot,
+#endif
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_unzstd_conf_t, enable),
       NULL },
 
     { ngx_string("unzstd_force"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
-      ngx_http_set_predicate_slot,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF
+#if (NGX_CONDITION)
+                        |NGX_HTTP_MAIN_WHEN_CONF|NGX_HTTP_SRV_WHEN_CONF
+                        |NGX_HTTP_LOC_WHEN_CONF
+#endif
+                        |NGX_CONF_FLAG,
+#if (NGX_CONDITION)
+      ngx_conf_set_conditional_flag_slot,
+#else
+      ngx_conf_set_flag_slot,
+#endif
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_unzstd_conf_t, force),
       NULL },
@@ -164,7 +191,11 @@ ngx_http_unzstd_header_filter(ngx_http_request_t *r)
     /* TODO support multiple content-codings */
     /* TODO ignore content encoding? */
 
+#if (NGX_CONDITION)
+    if (!ngx_http_get_conditional_flag_value(r, conf->enable)
+#else
     if (!conf->enable
+#endif
         || r->headers_out.content_encoding == NULL
         || r->headers_out.content_encoding->value.len != 4
         || ngx_strncasecmp(r->headers_out.content_encoding->value.data,
@@ -173,21 +204,16 @@ ngx_http_unzstd_header_filter(ngx_http_request_t *r)
         return ngx_http_next_header_filter(r);
     }
 
-    switch (ngx_http_test_predicates(r, conf->force)) {
-
-    case NGX_ERROR:
-        return NGX_ERROR;
-
-    case NGX_OK:
+#if (NGX_CONDITION)
+    if (!ngx_http_get_conditional_flag_value(r, conf->force)) {
+#else
+    if (!conf->force) {
+#endif
         r->gzip_vary = 1;
 
         if (ngx_http_zstd_ok(r) == NGX_OK) {
             return ngx_http_next_header_filter(r);
         }
-        break;
-
-    default: /* NGX_DECLINED */
-        break;
     }
 
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_unzstd_ctx_t));
@@ -959,8 +985,13 @@ ngx_http_unzstd_create_conf(ngx_conf_t *cf)
      *     conf->bufs.num = 0;
      */
 
+#if (NGX_CONDITION)
+    conf->enable = NGX_CONF_UNSET_PTR;
+    conf->force = NGX_CONF_UNSET_PTR;
+#else
     conf->enable = NGX_CONF_UNSET;
-    conf->force  = NGX_CONF_UNSET_PTR;
+    conf->force = NGX_CONF_UNSET;
+#endif
 
     return conf;
 }
@@ -972,8 +1003,22 @@ ngx_http_unzstd_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_unzstd_conf_t *prev = parent;
     ngx_http_unzstd_conf_t *conf = child;
 
+#if (NGX_CONDITION)
+    if (ngx_conf_merge_conditional_flag_value(cf, &conf->enable,
+            prev->enable, 0) != NGX_OK)
+    {
+        return NGX_CONF_ERROR;
+    }
+
+    if (ngx_conf_merge_conditional_flag_value(cf, &conf->force,
+            prev->force, 0) != NGX_OK)
+    {
+        return NGX_CONF_ERROR;
+    }
+#else
     ngx_conf_merge_value(conf->enable, prev->enable, 0);
-    ngx_conf_merge_ptr_value(conf->force, prev->force, NULL);
+    ngx_conf_merge_value(conf->force, prev->force, 0);
+#endif
 
     ngx_conf_merge_bufs_value(conf->bufs, prev->bufs,
                               (128 * 1024) / ngx_pagesize, ngx_pagesize);

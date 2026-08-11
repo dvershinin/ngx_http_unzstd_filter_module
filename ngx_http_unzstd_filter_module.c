@@ -1048,6 +1048,9 @@ ngx_http_unzstd_filter_alloc(void *opaque, size_t size)
     void  *p;
 
     p = ngx_palloc(ctx->request->pool, size);
+    if (p == NULL) {
+        return NULL;
+    }
 
     ngx_log_debug2(NGX_LOG_DEBUG_HTTP, ctx->request->connection->log, 0,
                    "unzstd alloc: %p, size: %uz", p, size);

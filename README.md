@@ -38,8 +38,9 @@ server {
 
 To use theses modules, configure your nginx branch with `--add-module=/path/to/ngx_http_unzstd_filter_module`. Several points should be taken care.
 
-* You can set environment variables `ZSTD_INC` and `ZSTD_LIB` to specify the path to `zstd.h` and the path to zstd shared library represently.
-* static library will be tried prior to dynamic library, since this Nginx module uses some **advanced APIs** where static linking is recommended.
+* Zstandard 1.4.0 or later is required.
+* You can set environment variables `ZSTD_INC` and `ZSTD_LIB` to specify the path to `zstd.h` and the path to the zstd library respectively.
+* A shared library is used when present; otherwise, the static library is used. Static linking is recommended because this Nginx module uses **advanced APIs**.
 * System's zstd bundle will be linked if `ZSTD_INC` and `ZSTD_LIB` are not specified.
 
 # Directives

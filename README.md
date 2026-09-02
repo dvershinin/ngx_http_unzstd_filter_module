@@ -14,9 +14,20 @@ ngx_http_unzstd_filter_module is a filter that decompresses responses with “Co
   - [unzstd\_buffers](#unzstd_buffers)
 - [Author](#author)
 - [License](#license)
+- [Testing](#testing)
 # Status
 
-This Nginx module is currently considered experimental. Issues and PRs are welcome if you encounter any problems.
+Actively maintained by [GetPageSpeed](https://www.getpagespeed.com/). This
+repository continues [the original module by Hanada](https://github.com/HanadaLee/ngx_http_unzstd_filter_module) with hardened response
+processing, deterministic cleanup, standalone zstd dependency detection, and a
+real NGINX regression suite. The suite specifically guards the historical
+double chunked-end-marker failure, fragmented upstream chunks, concatenated
+frames, corrupt and truncated input, dictionary handling, reloads, hostile
+clients, and worker replacement.
+
+Prebuilt packages for RHEL, Rocky Linux, AlmaLinux, Amazon Linux, Fedora,
+Debian, Ubuntu, SLES, and Plesk are available as `nginx-module-unzstd` from
+[GetPageSpeed extras](https://nginx-extras.getpagespeed.com/modules/unzstd/).
 
 # Synopsis
 
@@ -89,3 +100,23 @@ This module is based on [ngx_http_gunzip_module](https://nginx.org/en/docs/http/
 # License
 
 This Nginx module is licensed under [BSD 2-Clause License](LICENSE).
+
+# Testing
+
+The fast suite builds a real dynamic module and runs it with nginx.org's
+official `nginx-tests` harness:
+
+```bash
+make tests
+```
+
+The release gate also includes static ASan/UBSan execution, exhaustive
+cppcheck, CodeQL, renamed-module loading, `nginx -t` and `nginx -T`, hostile
+client probes, reload and worker-replacement checks, settled file-descriptor
+accounting, and schema-v1 Torture Lab evidence:
+
+```bash
+make lint
+make tests-asan
+make runtime
+```

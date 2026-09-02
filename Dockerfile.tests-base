@@ -1,0 +1,23 @@
+FROM ubuntu:24.04
+
+ARG NGINX_TESTS_REF=5432676478e4422db94c4249fd117cb87d89b33b
+
+RUN apt-get update --yes && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+      build-essential ca-certificates curl git \
+      libpcre2-dev libssl-dev libzstd-dev zlib1g-dev zstd \
+      cppcheck perl python3 procps && \
+    rm -rf /var/lib/apt/lists/*
+
+# The upstream suite uses nginx.org's object-oriented Test::Nginx harness,
+# not the similarly named OpenResty Test::Nginx::Socket distribution.
+RUN git init /opt/nginx-tests && \
+    git -C /opt/nginx-tests remote add origin \
+      https://github.com/nginx/nginx-tests.git && \
+    git -C /opt/nginx-tests fetch --depth 1 origin "$NGINX_TESTS_REF" && \
+    git -C /opt/nginx-tests checkout --detach FETCH_HEAD && \
+    perl -I/opt/nginx-tests/lib -MTest::Nginx \
+      -e 'die "official Test::Nginx object API missing\n" unless Test::Nginx->can("new")'
+
+ENV PERL5LIB=/opt/nginx-tests/lib
+WORKDIR /work

@@ -20,7 +20,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http gzip proxy ssi/)->has_daemon('zstd')
-    ->plan(46);
+    ->plan(47);
 
 my $plain = join('', map { sprintf "X%03dXXXXXX", $_ } (0 .. 999));
 my $boundary = 'B' x 1024;
@@ -204,6 +204,10 @@ like($r, qr/ 200 /, 'chunked boundary status');
 is(http_content($r), $boundary,
     'chunked frame ending before final buffer decompressed');
 
+$r = get_http11('/stream');
+my $end_markers = () = $r =~ /0\r\n\r\n/g;
+is($end_markers, 1, 'downstream emits one chunked end marker');
+
 $r = get('/page.html');
 unlike($r, qr/^Content-Encoding:/mi, 'ssi response is not encoded');
 is(http_content($r), "before $plain after", 'ssi subrequest decompressed');
@@ -274,6 +278,15 @@ sub head {
     my ($uri) = @_;
 
     return http("HEAD $uri HTTP/1.0\r\n"
+        . "Host: localhost\r\n"
+        . "Connection: close\r\n\r\n");
+}
+
+
+sub get_http11 {
+    my ($uri) = @_;
+
+    return http("GET $uri HTTP/1.1\r\n"
         . "Host: localhost\r\n"
         . "Connection: close\r\n\r\n");
 }

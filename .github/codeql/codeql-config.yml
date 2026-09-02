@@ -1,0 +1,6 @@
+name: "CodeQL config"
+
+paths:
+  - ngx_http_unzstd_filter_module.c
+paths-ignore:
+  - .build

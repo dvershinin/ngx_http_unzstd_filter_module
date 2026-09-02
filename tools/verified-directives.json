@@ -1,0 +1,47 @@
+{
+  "directives": [
+    {
+      "args_spec": "flag",
+      "contexts": [
+        "http",
+        "server",
+        "location"
+      ],
+      "name": "unzstd",
+      "subsystem": "http"
+    },
+    {
+      "args_spec": "2",
+      "contexts": [
+        "http",
+        "server",
+        "location"
+      ],
+      "name": "unzstd_buffers",
+      "subsystem": "http"
+    },
+    {
+      "args_spec": "1",
+      "contexts": [
+        "http"
+      ],
+      "name": "unzstd_dict_file",
+      "subsystem": "http"
+    },
+    {
+      "args_spec": "flag",
+      "contexts": [
+        "http",
+        "server",
+        "location"
+      ],
+      "name": "unzstd_force",
+      "subsystem": "http"
+    }
+  ],
+  "generator": "nginx101",
+  "schema_version": 1,
+  "source_files": {
+    "ngx_http_unzstd_filter_module.c": "118f523f28d71eb8d3c12e3a2f1242c1b04e2f9f5179be329b5b893dea2d1213"
+  }
+}

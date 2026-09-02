@@ -1,0 +1,4 @@
+// nginx entry points are reached through module and command tables.
+missingIncludeSystem
+unusedFunction
+unmatchedSuppression

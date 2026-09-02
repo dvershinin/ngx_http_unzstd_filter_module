@@ -1,0 +1,98 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: build-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Validate harness and evidence policy
+        run: |
+          bash -n docker-run-tests.sh tools/ci-build.sh
+          shellcheck docker-run-tests.sh tools/ci-build.sh
+          python3 -m py_compile \
+            tools/torture_lab.py tools/runtime_http.py tools/test_runtime.py \
+            tools/test_torture_lab.py tools/finalize_evidence.py
+          python3 tools/test_torture_lab.py
+          git diff --check
+
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        nginx-version: ["1.30.4", "1.31.1"]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Run official nginx-tests suite
+        run: make tests NGINX_VERSION=${{ matrix.nginx-version }}
+
+  asan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Run static ASan and UBSan suite
+        run: make tests-asan NGINX_VERSION=1.30.4
+
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          fetch-depth: 0
+      - name: Run Torture Lab against the dynamic module
+        run: make runtime NGINX_VERSION=1.30.4
+      - name: Upload runtime evidence
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: runtime-evidence
+          path: torture-lab-evidence.json
+          retention-days: 1
+
+  evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [validation, test, asan, runtime]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: runtime-evidence
+      - name: Finalize public evidence after sanitizer success
+        run: |
+          python3 tools/finalize_evidence.py \
+            torture-lab-evidence.json verified-unzstd.json
+          python3 -m json.tool verified-unzstd.json >/dev/null
+          if grep -Eq '/tmp/|/private/|file://|git@' verified-unzstd.json; then
+            echo "private path or URL leaked into public evidence" >&2
+            exit 1
+          fi
+      - name: Upload verified evidence
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: verified-unzstd
+          path: verified-unzstd.json
+          retention-days: 90
